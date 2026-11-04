@@ -305,31 +305,29 @@
     <main>
       <section class="form-card">
         <h2 class="section-title"><i class="fa-solid fa-plus-circle"></i> إضافة نشاط جديد للمشاركة</h2>
-        <form id="activityForm">
-          <div class="form-grid">
-            <div class="form-group">
-              <label>اسم الأستاذ(ة)</label>
-              <input type="text" id="teacherName" required placeholder="الاسم واللقب">
-            </div>
-            <div class="form-group">
-              <label>موضوع النشاط</label>
-              <input type="text" id="activityTopic" required placeholder="عنوان النشاط">
-            </div>
-            <div class="form-group">
-              <label>الفئة المستهدفة</label>
-              <input type="text" id="targetAudience" required placeholder="مثال: السنة الأولى">
-            </div>
-            <div class="form-group full-width">
-              <label>الهدف التربوي</label>
-              <textarea id="educationalGoal" rows="2" required placeholder="اكتب الهدف التربوي..."></textarea>
-            </div>
-            <div class="form-group full-width">
-              <label>صورة النشاط (اختياري)</label>
-              <input type="file" id="imageInput" accept="image/*">
-            </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>اسم الأستاذ(ة)</label>
+            <input type="text" id="teacherName" placeholder="الاسم واللقب">
           </div>
-          <button type="submit" class="btn-submit">نشر النشاط</button>
-        </form>
+          <div class="form-group">
+            <label>موضوع النشاط</label>
+            <input type="text" id="activityTopic" placeholder="عنوان النشاط">
+          </div>
+          <div class="form-group">
+            <label>الفئة المستهدفة</label>
+            <input type="text" id="targetAudience" placeholder="مثال: السنة الأولى">
+          </div>
+          <div class="form-group full-width">
+            <label>الهدف التربوي</label>
+            <textarea id="educationalGoal" rows="2" placeholder="اكتب الهدف التربوي..."></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label>صورة النشاط (اختياري)</label>
+            <input type="file" id="imageInput" accept="image/*">
+          </div>
+        </div>
+        <button type="button" class="btn-submit" onclick="publishActivity()">نشر النشاط</button>
       </section>
 
       <section>
@@ -380,41 +378,52 @@
       }
     });
 
-    document.getElementById('activityForm').addEventListener('submit', (e) => {
-      e.preventDefault();
+    function publishActivity() {
+      const name = document.getElementById('teacherName').value.trim();
+      const topic = document.getElementById('activityTopic').value.trim();
+      const target = document.getElementById('targetAudience').value.trim();
+      const goal = document.getElementById('educationalGoal').value.trim();
+
+      if (!name || !topic || !target || !goal) {
+        alert('الرجاء ملء جميع الحقول الإلزامية (الاسم، الموضوع، الفئة، والهدف)!');
+        return;
+      }
+
       const fileInput = document.getElementById('imageInput');
       const file = fileInput.files ? fileInput.files[0] : null;
-
       const defaultImage = 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80';
 
-      const createActivityObject = (imgSrc) => {
+      const saveNewAct = (imgSrc) => {
         const newAct = {
           id: Date.now().toString(),
-          teacherName: document.getElementById('teacherName').value,
-          topic: document.getElementById('activityTopic').value,
-          target: document.getElementById('targetAudience').value,
-          goal: document.getElementById('educationalGoal').value,
+          teacherName: name,
+          topic: topic,
+          target: target,
+          goal: goal,
           votes: { 1: 0, 2: 0, 3: 0 },
           image: imgSrc
         };
         activities.push(newAct);
         saveAndRender();
-        e.target.reset();
+        
+        // تفريغ الحقول بعد النشر بنجاح
+        document.getElementById('teacherName').value = '';
+        document.getElementById('activityTopic').value = '';
+        document.getElementById('targetAudience').value = '';
+        document.getElementById('educationalGoal').value = '';
+        fileInput.value = '';
+        alert('تم نشر النشاط بنجاح!');
       };
 
       if (file) {
         const reader = new FileReader();
-        reader.onload = (evt) => {
-          createActivityObject(evt.target.result);
-        };
-        reader.onerror = () => {
-          createActivityObject(defaultImage);
-        };
+        reader.onload = (evt) => { saveNewAct(evt.target.result); };
+        reader.onerror = () => { saveNewAct(defaultImage); };
         reader.readAsDataURL(file);
       } else {
-        createActivityObject(defaultImage);
+        saveNewAct(defaultImage);
       }
-    });
+    }
 
     function saveAndRender() {
       localStorage.setItem('almanar_activities', JSON.stringify(activities));
