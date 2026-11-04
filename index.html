@@ -255,7 +255,7 @@
       color: var(--text-main);
     }
 
-    input, textarea {
+    input, select, textarea {
       background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       color: var(--text-main);
@@ -265,7 +265,7 @@
       font-size: 1rem;
     }
 
-    input:focus, textarea:focus {
+    input:focus, select:focus, textarea:focus {
       border-color: var(--accent-cyan);
     }
 
@@ -426,6 +426,15 @@
               <label>الفئة المستهدفة</label>
               <input type="text" id="targetAudience" required placeholder="مثال: السنة الأولى / الثانية">
             </div>
+            <div class="form-group">
+              <label>تحديد المركز (اختياري)</label>
+              <select id="manualRank">
+                <option value="auto">تلقائي (حسب عدد الإعجابات)</option>
+                <option value="1">المركز الأول 🥇</option>
+                <option value="2">المركز الثاني 🥈</option>
+                <option value="3">المركز الثالث 🥉</option>
+              </select>
+            </div>
             <div class="form-group full-width">
               <label>الهدف التربوي من النشاط</label>
               <textarea id="educationalGoal" rows="3" required placeholder="اكتب الهدف التربوي..."></textarea>
@@ -439,7 +448,7 @@
         </form>
       </section>
 
-      <!-- Podium Top 3 (المرمز الأول، الثاني والثالث) -->
+      <!-- Podium Top 3 -->
       <section class="leaderboard-section">
         <h2 class="section-title"><i class="fa-solid fa-trophy" style="color:#f59e0b;"></i> منصة التتويج (المركز الأول، الثاني والثالث)</h2>
         <div class="podium-grid" id="podiumGrid"></div>
@@ -464,6 +473,7 @@
         target: 'السنة الأولى ابتدائي',
         goal: 'ترسيخ العادات الأسبوعية وتدريب التلميذات.',
         likes: 5,
+        manualRank: 'auto',
         image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80'
       }
     ];
@@ -521,6 +531,7 @@
         teacherName: document.getElementById('teacherName').value,
         topic: document.getElementById('activityTopic').value,
         target: document.getElementById('targetAudience').value,
+        manualRank: document.getElementById('manualRank').value,
         goal: document.getElementById('educationalGoal').value,
         likes: 0,
         image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80'
@@ -606,24 +617,49 @@
         grid.appendChild(card);
       });
 
-      // ترتيب الأنشطة تنازلياً حسب الإعجابات لتحديد المرمز الأول، الثاني والثالث
-      const sorted = [...activities].sort((a, b) => b.likes - a.likes).slice(0, 3);
+      // تحديد المراكز الثلاثة الأولى (بناءً على التحديد اليدوي للمراكز أو التلقائي بالإعجابات)
+      let podiumList = [null, null, null];
+
+      activities.forEach(act => {
+        if (act.manualRank === '1' && !podiumList[0]) podiumList[0] = act;
+        if (act.manualRank === '2' && !podiumList[1]) podiumList[1] = act;
+        if (act.manualRank === '3' && !podiumList[2]) podiumList[2] = act;
+      });
+
+      const remainingActivities = [...activities]
+        .filter(act => !podiumList.includes(act))
+        .sort((a, b) => b.likes - a.likes);
+
+      for (let i = 0; i < 3; i++) {
+        if (!podiumList[i] && remainingActivities.length > 0) {
+          podiumList[i] = remainingActivities.shift();
+        }
+      }
+
       const podiumGrid = document.getElementById('podiumGrid');
       podiumGrid.innerHTML = '';
 
       const rankLabels = ["المركز الأول 🥇", "المركز الثاني 🥈", "المركز الثالث 🥉"];
 
-      sorted.forEach((act, idx) => {
+      podiumList.forEach((act, idx) => {
         const pCard = document.createElement('div');
         pCard.className = `podium-card rank-${idx + 1}`;
-        pCard.innerHTML = `
-          <div class="badge-rank">${rankLabels[idx]}</div>
-          <h3 style="margin-top:15px; font-size:1.3rem; color:var(--accent-cyan);">${act.teacherName}</h3>
-          <p style="margin: 5px 0; font-weight:700;">${act.topic}</p>
-          <div style="font-weight:bold; font-size:1.2rem; margin-top:10px; color:var(--accent-gold);">
-            ❤️ ${act.likes} إعجاب
-          </div>
-        `;
+        if (act) {
+          pCard.innerHTML = `
+            <div class="badge-rank">${rankLabels[idx]}</div>
+            <h3 style="margin-top:15px; font-size:1.3rem; color:var(--accent-cyan);">${act.teacherName}</h3>
+            <p style="margin: 5px 0; font-weight:700;">${act.topic}</p>
+            <div style="font-weight:bold; font-size:1.2rem; margin-top:10px; color:var(--accent-gold);">
+              ❤️ ${act.likes} إعجاب
+            </div>
+          `;
+        } else {
+          pCard.innerHTML = `
+            <div class="badge-rank">${rankLabels[idx]}</div>
+            <h3 style="margin-top:25px; color:var(--text-muted);">مفاجأة قادمة</h3>
+            <p style="color:var(--text-muted); font-size:0.9rem;">في انتظار انضمام الأنشطة...</p>
+          `;
+        }
         podiumGrid.appendChild(pCard);
       });
     }
