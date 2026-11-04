@@ -324,7 +324,7 @@
               <textarea id="educationalGoal" rows="2" required placeholder="اكتب الهدف التربوي..."></textarea>
             </div>
             <div class="form-group full-width">
-              <label>صورة النشاط</label>
+              <label>صورة النشاط (اختياري)</label>
               <input type="file" id="imageInput" accept="image/*">
             </div>
           </div>
@@ -349,7 +349,7 @@
 
   <script>
     let activities = JSON.parse(localStorage.getItem('almanar_activities')) || [];
-    let userVotes = JSON.parse(localStorage.getItem('almanar_user_votes')) || {}; // تخزين أصوات المستخدم: {activityId: rankNum}
+    let userVotes = JSON.parse(localStorage.getItem('almanar_user_votes')) || {};
     let isAdmin = false;
     const MAX_VOTES = 3;
 
@@ -382,30 +382,37 @@
 
     document.getElementById('activityForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      const file = document.getElementById('imageInput').files[0];
-      const newAct = {
-        id: Date.now().toString(),
-        teacherName: document.getElementById('teacherName').value,
-        topic: document.getElementById('activityTopic').value,
-        target: document.getElementById('targetAudience').value,
-        goal: document.getElementById('educationalGoal').value,
-        votes: { 1: 0, 2: 0, 3: 0 }, // عداد الأصوات لكل مرتبة
-        image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80'
+      const fileInput = document.getElementById('imageInput');
+      const file = fileInput.files ? fileInput.files[0] : null;
+
+      const defaultImage = 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80';
+
+      const createActivityObject = (imgSrc) => {
+        const newAct = {
+          id: Date.now().toString(),
+          teacherName: document.getElementById('teacherName').value,
+          topic: document.getElementById('activityTopic').value,
+          target: document.getElementById('targetAudience').value,
+          goal: document.getElementById('educationalGoal').value,
+          votes: { 1: 0, 2: 0, 3: 0 },
+          image: imgSrc
+        };
+        activities.push(newAct);
+        saveAndRender();
+        e.target.reset();
       };
 
       if (file) {
         const reader = new FileReader();
         reader.onload = (evt) => {
-          newAct.image = evt.target.result;
-          activities.push(newAct);
-          saveAndRender();
-          e.target.reset();
+          createActivityObject(evt.target.result);
+        };
+        reader.onerror = () => {
+          createActivityObject(defaultImage);
         };
         reader.readAsDataURL(file);
       } else {
-        activities.push(newAct);
-        saveAndRender();
-        e.target.reset();
+        createActivityObject(defaultImage);
       }
     });
 
@@ -417,20 +424,16 @@
 
     function voteActivity(id, rank) {
       const currentVoteForThis = userVotes[id];
-      const totalVotesCount = Object.keys(userVotes).length;
 
-      // إذا كان قد صوت لهذا النشاط نفس المرتبة، يقم بإلغاء التصويت
       if (currentVoteForThis === rank) {
         delete userVotes[id];
         activities.find(a => a.id === id).votes[rank]--;
       } else {
-        // إذا كان صوت مسبقاً بمرتبة أخرى لنفس النشاط، يغيرها
         if (currentVoteForThis) {
           activities.find(a => a.id === id).votes[currentVoteForThis]--;
           delete userVotes[id];
         }
 
-        // التحقق من الحد الأقصى للأصوات (3 أصوات مختلفة)
         if (Object.keys(userVotes).length >= MAX_VOTES) {
           alert('لقد استهلكت أصواتك الثلاثة المسموح بها! يمكنك إلغاء صوت سابق لتغييره.');
           return;
@@ -445,7 +448,6 @@
     function deleteAct(id) {
       if(isAdmin) {
         activities = activities.filter(a => a.id !== id);
-        // حذف أصوات هذا النشاط من سجل المستخدمين
         delete userVotes[id];
         saveAndRender();
       }
@@ -491,9 +493,7 @@
         `;
       });
 
-      // تحديد المراكز الثلاثة في منصة التتويج بناءً على أكثر نشاط حصل على أصوات في كل مرتبة
       let podium = [null, null, null];
-      
       [1, 2, 3].forEach((rankIdx, arrayIdx) => {
         let bestAct = null;
         let maxVotes = -1;
