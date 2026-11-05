@@ -6,6 +6,11 @@
   <title>ابتدائية المنار القرآنية إناث - أفضل نشاط شهر أكتوبر 2026</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
   <style>
     :root {
       --bg-primary: #0f172a;
@@ -127,15 +132,12 @@
       gap: 10px;
     }
 
-    /* منصة التتويج مخفية افتراضياً وتظهر فقط للأدمين */
     .podium-section {
       display: none;
       margin-bottom: 40px;
     }
 
-    body.is-admin .podium-section {
-      display: block;
-    }
+    body.is-admin .podium-section { display: block; }
 
     .podium-grid {
       display: grid;
@@ -299,14 +301,8 @@
     .btn-vote.voted-2 { background: #94a3b8; color: white; border-color: #94a3b8; }
     .btn-vote.voted-3 { background: #b45309; color: white; border-color: #b45309; }
 
-    /* إخفاء عداد الأصوات عن المستخدم العادي وإظهاره للأدمين */
-    .vote-count {
-      display: none;
-    }
-
-    body.is-admin .vote-count {
-      display: inline;
-    }
+    .vote-count { display: none; }
+    body.is-admin .vote-count { display: inline; }
 
     .admin-actions {
       position: absolute;
@@ -330,7 +326,7 @@
     </header>
 
     <div class="admin-bar" id="adminBar">
-      <span>⚙️ <strong>وضع المشرف مفعل:</strong> يمكنك الاطلاع على نتائج التصويت ومسح الأنشطة.</span>
+      <span>⚙️ <strong>وضع المشرف مفعل:</strong> نتائج التصويت مباشرة وحية.</span>
       <button class="btn-danger" id="btnClearAll">مسح الكل</button>
     </div>
 
@@ -366,9 +362,8 @@
         <button type="button" class="btn-submit" onclick="publishActivity()">نشر النشاط</button>
       </section>
 
-      <!-- منصة التتويج تظهر للمشرف فقط -->
       <section class="podium-section">
-        <h2 class="section-title"><i class="fa-solid fa-trophy" style="color:#f59e0b;"></i> نتائج المنصة (خاص بالمشرف)</h2>
+        <h2 class="section-title"><i class="fa-solid fa-trophy" style="color:#f59e0b;"></i> نتائج المنصة السحابية (خاص بالمشرف)</h2>
         <div class="podium-grid" id="podiumGrid"></div>
       </section>
 
@@ -383,11 +378,30 @@
   </div>
 
   <script>
-    let activities = JSON.parse(localStorage.getItem('almanar_activities')) || [];
+    // تهيئة قاعدة البيانات السحابية Firebase
+    const firebaseConfig = {
+      databaseURL: "https://almanar-activity-default-rtdb.firebaseio.com"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let activities = [];
     let userVotes = JSON.parse(localStorage.getItem('almanar_user_votes')) || {};
     let isAdmin = false;
     const MAX_VOTES = 3;
     const ADMIN_PASS = "1593";
+
+    // الاستماع المباشر للتغييرات في السحابة
+    db.ref('activities').on('value', (snapshot) => {
+      const data = snapshot.val();
+      activities = [];
+      if (data) {
+        Object.keys(data).forEach(key => {
+          activities.push({ id: key, ...data[key] });
+        });
+      }
+      render();
+    });
 
     document.getElementById('themeToggle').addEventListener('click', () => {
       const isLight = document.body.getAttribute('data-theme') === 'light';
@@ -400,21 +414,21 @@
           isAdmin = true;
           document.body.classList.add('is-admin');
           document.getElementById('adminBar').classList.add('active');
-          alert("تم دخول لوحة المشرف وإظهار نتائج التصويت بنجاح!");
+          render();
         } else { alert("الرقم السري خاطئ!"); }
       } else {
         isAdmin = false;
         document.body.classList.remove('is-admin');
         document.getElementById('adminBar').classList.remove('active');
-        alert("تم الخروج من وضع المشرف وإخفاء النتائج.");
+        render();
       }
     });
 
     document.getElementById('btnClearAll').addEventListener('click', () => {
-      if(isAdmin && confirm('مسح جميع الأنشطة؟')) {
-        activities = [];
+      if(isAdmin && confirm('مسح جميع الأنشطة من السحابة؟')) {
+        db.ref('activities').remove();
         userVotes = {};
-        saveAndRender();
+        localStorage.removeItem('almanar_user_votes');
       }
     });
 
@@ -434,9 +448,9 @@
       const file = fileInput.files ? fileInput.files[0] : null;
       const defaultImage = 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80';
 
-      const saveNewAct = (imgSrc) => {
-        const newAct = {
-          id: Date.now().toString(),
+      const pushToCloud = (imgSrc) => {
+        const newRef = db.ref('activities').push();
+        newRef.set({
           teacherName: name,
           topic: topic,
           target: target,
@@ -444,63 +458,63 @@
           videoLink: video,
           votes: { 1: 0, 2: 0, 3: 0 },
           image: imgSrc
-        };
-        activities.push(newAct);
-        saveAndRender();
-        
-        document.getElementById('teacherName').value = '';
-        document.getElementById('activityTopic').value = '';
-        document.getElementById('targetAudience').value = '';
-        document.getElementById('educationalGoal').value = '';
-        document.getElementById('videoLink').value = '';
-        fileInput.value = '';
-        alert('تم نشر النشاط بنجاح!');
+        }, (error) => {
+          if (!error) {
+            document.getElementById('teacherName').value = '';
+            document.getElementById('activityTopic').value = '';
+            document.getElementById('targetAudience').value = '';
+            document.getElementById('educationalGoal').value = '';
+            document.getElementById('videoLink').value = '';
+            fileInput.value = '';
+            alert('تم نشر النشاط بنجاح في السحابة وتحديثه عند الجميع!');
+          } else {
+            alert('حدث خطأ في الاتصال بالسحابة!');
+          }
+        });
       };
 
       if (file) {
         const reader = new FileReader();
-        reader.onload = (evt) => { saveNewAct(evt.target.result); };
-        reader.onerror = () => { saveNewAct(defaultImage); };
+        reader.onload = (evt) => { pushToCloud(evt.target.result); };
+        reader.onerror = () => { pushToCloud(defaultImage); };
         reader.readAsDataURL(file);
       } else {
-        saveNewAct(defaultImage);
+        pushToCloud(defaultImage);
       }
-    }
-
-    function saveAndRender() {
-      localStorage.setItem('almanar_activities', JSON.stringify(activities));
-      localStorage.setItem('almanar_user_votes', JSON.stringify(userVotes));
-      render();
     }
 
     function voteActivity(id, rank) {
       const currentVoteForThis = userVotes[id];
+      const act = activities.find(a => a.id === id);
+      if (!act) return;
+
+      let votesObj = act.votes || { 1: 0, 2: 0, 3: 0 };
 
       if (currentVoteForThis === rank) {
         delete userVotes[id];
-        activities.find(a => a.id === id).votes[rank]--;
+        votesObj[rank] = Math.max(0, (votesObj[rank] || 0) - 1);
       } else {
         if (currentVoteForThis) {
-          activities.find(a => a.id === id).votes[currentVoteForThis]--;
+          votesObj[currentVoteForThis] = Math.max(0, (votesObj[currentVoteForThis] || 0) - 1);
           delete userVotes[id];
         }
 
         if (Object.keys(userVotes).length >= MAX_VOTES) {
-          alert('لقد استهلكت أصواتك الثلاثة المسموح بها! يمكنك إلغاء صوت سابق لتغييره.');
+          alert('لقد استهلكت أصواتك الثلاثة المسموح بها!');
           return;
         }
 
         userVotes[id] = rank;
-        activities.find(a => a.id === id).votes[rank]++;
+        votesObj[rank] = (votesObj[rank] || 0) + 1;
       }
-      saveAndRender();
+
+      localStorage.setItem('almanar_user_votes', JSON.stringify(userVotes));
+      db.ref(`activities/${id}/votes`).set(votesObj);
     }
 
     function deleteAct(id) {
-      if(isAdmin) {
-        activities = activities.filter(a => a.id !== id);
-        delete userVotes[id];
-        saveAndRender();
+      if(isAdmin && confirm('حذف هذا النشاط؟')) {
+        db.ref(`activities/${id}`).remove();
       }
     }
 
@@ -513,6 +527,7 @@
 
       activities.forEach(act => {
         const myVote = userVotes[act.id];
+        const votesObj = act.votes || { 1: 0, 2: 0, 3: 0 };
         grid.innerHTML += `
           <div class="activity-card">
             <div class="admin-actions">
@@ -530,13 +545,13 @@
                 <span style="font-size:0.85rem; font-weight:bold;">ترشيح النشاط:</span>
                 <div class="vote-buttons">
                   <button class="btn-vote ${myVote === 1 ? 'voted-1' : ''}" onclick="voteActivity('${act.id}', 1)">
-                    🥇 أول <span class="vote-count">(${act.votes[1]})</span>
+                    🥇 أول <span class="vote-count">(${votesObj[1] || 0})</span>
                   </button>
                   <button class="btn-vote ${myVote === 2 ? 'voted-2' : ''}" onclick="voteActivity('${act.id}', 2)">
-                    🥈 ثاني <span class="vote-count">(${act.votes[2]})</span>
+                    🥈 ثاني <span class="vote-count">(${votesObj[2] || 0})</span>
                   </button>
                   <button class="btn-vote ${myVote === 3 ? 'voted-3' : ''}" onclick="voteActivity('${act.id}', 3)">
-                    🥉 ثالث <span class="vote-count">(${act.votes[3]})</span>
+                    🥉 ثالث <span class="vote-count">(${votesObj[3] || 0})</span>
                   </button>
                 </div>
               </div>
@@ -545,14 +560,15 @@
         `;
       });
 
-      // إعداد بيانات منصة التتويج للمشرف
       let podium = [null, null, null];
       [1, 2, 3].forEach((rankIdx, arrayIdx) => {
         let bestAct = null;
         let maxVotes = -1;
         activities.forEach(act => {
-          if (act.votes[rankIdx] > maxVotes) {
-            maxVotes = act.votes[rankIdx];
+          const votesObj = act.votes || { 1: 0, 2: 0, 3: 0 };
+          const count = votesObj[rankIdx] || 0;
+          if (count > maxVotes) {
+            maxVotes = count;
             bestAct = act;
           }
         });
@@ -565,13 +581,14 @@
 
       podium.forEach((act, idx) => {
         const rankNum = idx + 1;
+        const votesObj = act ? (act.votes || {}) : {};
         podiumGrid.innerHTML += `
           <div class="podium-card rank-${rankNum}">
             <div class="badge-rank">${titles[idx]}</div>
             ${act ? `
               <h3 style="margin-top:20px; color:var(--accent-cyan);">${act.teacherName}</h3>
               <p style="font-weight:bold; margin:5px 0;">${act.topic}</p>
-              <div style="color:var(--accent-gold); font-weight:bold;">⭐ الأصوات: ${act.votes[rankNum]}</div>
+              <div style="color:var(--accent-gold); font-weight:bold;">⭐ الأصوات: ${votesObj[rankNum] || 0}</div>
             ` : `
               <h3 style="margin-top:25px; color:var(--text-muted);">لا توجد أصوات بعد</h3>
             `}
