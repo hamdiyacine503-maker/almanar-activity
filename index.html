@@ -326,7 +326,7 @@
     </header>
 
     <div class="admin-bar" id="adminBar">
-      <span>⚙️ <strong>وضع المشرف مفعل:</strong> نتائج التصويت مباشرة وحية.</span>
+      <span>⚙️ <strong>وضع المشرف مفعل:</strong> النتائج سحابية وحية.</span>
       <button class="btn-danger" id="btnClearAll">مسح الكل</button>
     </div>
 
@@ -378,9 +378,9 @@
   </div>
 
   <script>
-    // تهيئة قاعدة البيانات السحابية Firebase
+    // إعدادات قاعدة البيانات السحابية المربوطة بمشروعك
     const firebaseConfig = {
-      databaseURL: "https://almanar-activity-default-rtdb.firebaseio.com"
+      databaseURL: "https://manar-activity-default-rtdb.europe-west1.firebasedatabase.app/"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -391,7 +391,6 @@
     const MAX_VOTES = 3;
     const ADMIN_PASS = "1593";
 
-    // الاستماع المباشر للتغييرات في السحابة
     db.ref('activities').on('value', (snapshot) => {
       const data = snapshot.val();
       activities = [];
@@ -449,28 +448,32 @@
       const defaultImage = 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80';
 
       const pushToCloud = (imgSrc) => {
-        const newRef = db.ref('activities').push();
-        newRef.set({
-          teacherName: name,
-          topic: topic,
-          target: target,
-          goal: goal,
-          videoLink: video,
-          votes: { 1: 0, 2: 0, 3: 0 },
-          image: imgSrc
-        }, (error) => {
-          if (!error) {
-            document.getElementById('teacherName').value = '';
-            document.getElementById('activityTopic').value = '';
-            document.getElementById('targetAudience').value = '';
-            document.getElementById('educationalGoal').value = '';
-            document.getElementById('videoLink').value = '';
-            fileInput.value = '';
-            alert('تم نشر النشاط بنجاح في السحابة وتحديثه عند الجميع!');
-          } else {
-            alert('حدث خطأ في الاتصال بالسحابة!');
-          }
-        });
+        try {
+          const newRef = db.ref('activities').push();
+          newRef.set({
+            teacherName: name,
+            topic: topic,
+            target: target,
+            goal: goal,
+            videoLink: video,
+            votes: { 1: 0, 2: 0, 3: 0 },
+            image: imgSrc
+          }, (error) => {
+            if (!error) {
+              document.getElementById('teacherName').value = '';
+              document.getElementById('activityTopic').value = '';
+              document.getElementById('targetAudience').value = '';
+              document.getElementById('educationalGoal').value = '';
+              document.getElementById('videoLink').value = '';
+              fileInput.value = '';
+              alert('تم نشر النشاط بنجاح في السحابة!');
+            } else {
+              alert('فشل النشر: تأكد من اتصال الإنترنت أو قواعد أمان قاعدة البيانات.');
+            }
+          });
+        } catch(e) {
+          alert('حدث خطأ غير متوقع أثناء الاتصال.');
+        }
       };
 
       if (file) {
